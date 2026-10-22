@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:55432:5432"
+    shm_size: 256mb
+    tmpfs:
+      - /var/lib/postgresql:rw,noexec,nosuid,size=1g
+    volumes:
+      - ./apps/api/prisma:/workspace/prisma:ro
+      - ./apps/api/test/fixtures:/workspace/test-fixtures:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

@@ -1,0 +1,37 @@
+{
+  "name": "@metrivo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "test": "npm run test:compile && node --test .test-build/test/authorization.guard.test.js .test-build/test/support-access.service.test.js .test-build/test/platform-administration.service.test.js .test-build/test/invitation.service.test.js .test-build/test/invitation.controller.test.js .test-build/test/product.service.test.js .test-build/test/product.controller.test.js .test-build/test/sales.service.test.js .test-build/test/sales.controller.test.js .test-build/test/branch-access.service.test.js .test-build/test/branch-access.controller.test.js .test-build/test/auth/authentication.guard.test.js .test-build/test/auth/auth.service.test.js .test-build/test/auth/login.dto.test.js",
+    "test:postgres": "node test/run-postgres-integration.cjs",
+    "test:compile": "tsc --project tsconfig.test.json",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate"
+  },
+  "dependencies": {
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/throttler": "^6.7.1",
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-express": "^11.2.7",
+    "@prisma/client": "^6.19.0",
+    "argon2": "^0.45.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@types/node": "^24.13.3",
+    "prisma": "^6.19.0",
+    "typescript": "^5.9.3"
+  }
+}

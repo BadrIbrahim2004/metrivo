@@ -1,0 +1,270 @@
+.sales-login {
+  max-width: 440px;
+}
+
+.sales-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sales-toolbar .branch-picker {
+  flex: 1;
+  max-width: 440px;
+  margin: 0;
+}
+
+.sales-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1.2;
+  min-width: 180px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.sales-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+}
+
+.sales-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  align-items: start;
+  gap: 18px;
+}
+
+.sales-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.sales-product {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+
+.sales-product:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--primary, #7257d9);
+}
+
+.sales-product:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sales-product-copy,
+.sales-line-description {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sales-product-copy strong,
+.sales-line-description strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-product-copy small,
+.sales-line-description span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sales-checkout {
+  display: grid;
+  gap: 13px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.sales-checkout h2,
+.sales-history h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.sales-checkout label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sales-checkout input,
+.sales-checkout select {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.sales-cart-lines {
+  display: grid;
+  gap: 10px;
+  max-height: 290px;
+  overflow: auto;
+}
+
+.sales-cart-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sales-quantity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sales-quantity button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.sales-quantity button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sales-quantity .sales-remove {
+  margin-inline-start: 3px;
+  color: #b42318;
+}
+
+.sales-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sales-grand-total {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.sales-submit {
+  width: 100%;
+  min-height: 44px;
+}
+
+.sales-receipt {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 15px 18px;
+  border: 1px solid #a9d8b9;
+  border-radius: 11px;
+  color: #19613a;
+  background: #effaf3;
+}
+
+.sales-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.sales-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sales-history-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.sales-history-list article > div {
+  display: grid;
+  gap: 5px;
+}
+
+.sales-history-list time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .sales-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sales-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sales-toolbar .branch-picker {
+    max-width: none;
+  }
+
+  .sales-cart-line,
+  .sales-receipt {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sales-quantity {
+    align-self: end;
+  }
+}

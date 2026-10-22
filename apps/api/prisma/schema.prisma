@@ -1,0 +1,434 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum BranchAccessMode {
+  ALL_BRANCHES
+  SELECTED_BRANCHES
+}
+
+enum SaleStatus {
+  COMPLETED
+}
+
+enum SalePaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+model User {
+  id                    String             @id @default(cuid())
+  email                 String             @unique
+  emailNormalized       String             @unique
+  name                  String?
+  passwordHash          String?
+  status                UserStatus         @default(ACTIVE)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  memberships           TenantMembership[]
+  platformRoles         UserPlatformRole[]
+  platformOwnerRegistry PlatformOwnerRegistry?
+  sentInvitations       TenantInvitation[] @relation("InvitationIssuer")
+  supportGrants         SupportAccessGrant[] @relation("SupportOperator")
+  approvedSupportGrants SupportAccessGrant[] @relation("SupportApprover")
+  createdProducts       Product[]
+  inventoryMovements    InventoryMovement[]
+  tenantAuditEvents     TenantAuditLog[]
+  sales                 Sale[]
+}
+
+model Tenant {
+  id             String              @id @default(cuid())
+  name           String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  branches       Branch[]
+  memberships    TenantMembership[]
+  roles          Role[]
+  supportGrants  SupportAccessGrant[]
+  invitations    TenantInvitation[]
+  products       Product[]
+  inventoryMovements InventoryMovement[]
+  auditLogs TenantAuditLog[]
+  sales     Sale[]
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  memberships BranchMembership[]
+  inventoryMovements InventoryMovement[]
+  sales              Sale[]
+
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model TenantMembership {
+  id        String                 @id @default(cuid())
+  userId    String
+  tenantId  String
+  status    MembershipStatus       @default(PENDING)
+  branchAccessMode BranchAccessMode @default(SELECTED_BRANCHES)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roles     MembershipRole[]
+  branchAccess BranchMembership[]
+  auditEvents TenantAuditLog[]
+
+  @@unique([userId, tenantId])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model BranchMembership {
+  id           String           @id @default(cuid())
+  membershipId String
+  tenantId     String
+  branchId     String
+  createdAt    DateTime         @default(now())
+  membership   TenantMembership @relation(fields: [membershipId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+  branch       Branch           @relation(fields: [branchId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([membershipId, branchId])
+  @@index([tenantId, branchId])
+  @@index([membershipId, tenantId])
+}
+
+model Role {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  isInviteAssignable Boolean                @default(false)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  memberships       MembershipRole[]
+  permissions       TenantRolePermission[]
+  invitations       TenantInvitation[]
+
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model TenantPermission {
+  id                    String                       @id @default(cuid())
+  key                   String                       @unique
+  description           String
+  supportEligible       Boolean                      @default(false)
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  roles                 TenantRolePermission[]
+  supportGrantAllowlist SupportAccessGrantPermission[]
+}
+
+model TenantRolePermission {
+  id           String           @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  role         Role             @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  permission   TenantPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model MembershipRole {
+  id           String           @id @default(cuid())
+  membershipId String
+  tenantId     String
+  roleId       String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  membership   TenantMembership @relation(fields: [membershipId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+  role         Role             @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([membershipId, roleId])
+  @@index([tenantId, membershipId])
+  @@index([roleId, tenantId])
+}
+
+model PlatformRole {
+  id          String                   @id @default(cuid())
+  key         String                   @unique
+  name        String                   @unique
+  description String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  users       UserPlatformRole[]
+  permissions PlatformRolePermission[]
+}
+
+model PlatformPermission {
+  id          String                   @id @default(cuid())
+  key         String                   @unique
+  description String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  roles       PlatformRolePermission[]
+}
+
+model UserPlatformRole {
+  userId        String
+  platformRoleId String
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  platformRole  PlatformRole @relation(fields: [platformRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([userId, platformRoleId])
+  @@index([platformRoleId])
+}
+
+model PlatformRolePermission {
+  platformRoleId     String
+  platformPermissionId String
+  createdAt          DateTime           @default(now())
+  platformRole       PlatformRole       @relation(fields: [platformRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  platformPermission PlatformPermission @relation(fields: [platformPermissionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([platformRoleId, platformPermissionId])
+  @@index([platformPermissionId])
+}
+
+model PlatformOwnershipState {
+  singleton   Boolean @id @default(true)
+  initialized Boolean @default(false)
+}
+
+model PlatformOwnerRegistry {
+  singleton   Boolean  @id @default(true)
+  ownerUserId String   @unique
+  assignedAt  DateTime @default(now()) @db.Timestamptz(6)
+  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+}
+
+model PlatformAuditLog {
+  id          String   @id
+  actorUserId String   @db.VarChar(255)
+  action      String   @db.VarChar(100)
+  targetType  String   @db.VarChar(100)
+  targetId    String?  @db.VarChar(255)
+  outcome     String   @db.VarChar(32)
+  metadata    Json?    @db.JsonB
+  occurredAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([actorUserId, occurredAt])
+  @@index([targetType, targetId, occurredAt])
+  @@index([action, occurredAt])
+}
+
+model TenantInvitation {
+  id                   String    @id @default(cuid())
+  tokenHash            String    @unique @db.Char(64)
+  email                String
+  emailNormalized      String
+  tenantId             String
+  roleId               String
+  rolePermissionsHash  String    @db.Char(64)
+  invitedByUserId      String
+  createdAt            DateTime  @default(now()) @db.Timestamptz(6)
+  expiresAt            DateTime  @db.Timestamptz(6)
+  revokedAt            DateTime? @db.Timestamptz(6)
+  acceptedAt           DateTime? @db.Timestamptz(6)
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  role                 Role      @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  invitedBy            User      @relation("InvitationIssuer", fields: [invitedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([emailNormalized, tenantId])
+  @@index([expiresAt])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sku         String
+  name        String
+  category    String?
+  description String?
+  price       Decimal  @db.Decimal(12, 2)
+  isActive    Boolean  @default(true)
+  createdByUserId String
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy   User     @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements   InventoryMovement[]
+  saleItems   SaleItem[]
+
+  @@unique([tenantId, sku])
+  @@unique([id, tenantId])
+  @@index([tenantId, isActive, name])
+}
+
+model InventoryMovement {
+  id             String   @id @default(cuid())
+  tenantId       String
+  branchId       String
+  productId      String
+  actorUserId    String
+  quantityDelta  Int
+  reason         String   @db.VarChar(500)
+  saleId         String?
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  branch         Branch   @relation(fields: [branchId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  product        Product  @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  actor          User     @relation(fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sale           Sale?    @relation(fields: [saleId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tenantId, branchId, productId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([saleId, tenantId])
+}
+
+model Sale {
+  id             String           @id
+  tenantId       String
+  branchId       String
+  actorUserId    String
+  invoiceNumber  String           @db.VarChar(64)
+  idempotencyKey String           @db.VarChar(128)
+  requestHash    String           @db.Char(64)
+  status         SaleStatus       @default(COMPLETED)
+  paymentMethod  SalePaymentMethod
+  subtotal       Decimal          @db.Decimal(12, 2)
+  discount       Decimal          @db.Decimal(12, 2)
+  total          Decimal          @db.Decimal(12, 2)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  branch         Branch           @relation(fields: [branchId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  actor          User             @relation(fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items          SaleItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, branchId, actorUserId, idempotencyKey])
+  @@index([tenantId, branchId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model SaleItem {
+  id          String   @id
+  tenantId    String
+  saleId      String
+  productId   String
+  productName String   @db.VarChar(200)
+  productSku  String   @db.VarChar(64)
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  lineTotal   Decimal  @db.Decimal(12, 2)
+  sale        Sale     @relation(fields: [saleId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  product     Product  @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([saleId, tenantId])
+  @@index([tenantId, productId])
+}
+
+model TenantAuditLog {
+  id                  String           @id
+  tenantId            String
+  actorUserId          String
+  targetMembershipId   String
+  action               String           @db.VarChar(100)
+  metadata             Json?            @db.JsonB
+  occurredAt           DateTime         @default(now()) @db.Timestamptz(6)
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actor                User             @relation(fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  targetMembership     TenantMembership @relation(fields: [targetMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([targetMembershipId, tenantId, occurredAt])
+}
+
+model InvitationAcceptanceRateLimit {
+  keyHash         String   @id @db.Char(64)
+  windowStartedAt DateTime @db.Timestamptz(6)
+  requestCount    Int
+  updatedAt       DateTime @db.Timestamptz(6)
+
+  @@index([updatedAt])
+}
+
+model SupportAccessGrant {
+  id                String                       @id @default(cuid())
+  supportUserId     String
+  approvedByUserId  String
+  tenantId          String
+  reason            String                       @db.VarChar(1000)
+  startsAt          DateTime                     @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  supportUser       User                         @relation("SupportOperator", fields: [supportUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  approvedBy        User                         @relation("SupportApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tenant            Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  permissions       SupportAccessGrantPermission[]
+  auditLogs         SupportAccessAuditLog[]
+
+  @@unique([id, tenantId])
+  @@index([supportUserId, tenantId, expiresAt])
+  @@index([tenantId])
+  @@index([approvedByUserId])
+}
+
+model SupportAccessGrantPermission {
+  grantId      String
+  permissionId String
+  createdAt    DateTime         @default(now())
+  grant        SupportAccessGrant @relation(fields: [grantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  permission   TenantPermission @relation(fields: [permissionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([grantId, permissionId])
+  @@index([permissionId])
+}
+
+model SupportAccessAuditLog {
+  id           String            @id @default(cuid())
+  grantId      String
+  actorUserId  String
+  tenantId     String
+  action       String            @db.VarChar(100)
+  permissionKey String?          @db.VarChar(200)
+  reason       String            @db.VarChar(1000)
+  resource     String?           @db.VarChar(500)
+  occurredAt   DateTime          @default(now())
+  grant        SupportAccessGrant @relation(fields: [grantId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([grantId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}

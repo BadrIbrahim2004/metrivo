@@ -1,0 +1,7 @@
+export const PRODUCT_READ_PERMISSION = 'catalog.products.read'
+export const PRODUCT_MANAGE_PERMISSION = 'catalog.products.manage'
+export const INVENTORY_READ_PERMISSION = 'inventory.read'
+export const INVENTORY_ADJUST_PERMISSION = 'inventory.adjust'
+export const TENANT_MEMBERS_MANAGE_PERMISSION = 'tenant.members.manage'
+export const SALES_CREATE_PERMISSION = 'sales.create'
+export const SALES_READ_PERMISSION = 'sales.read'
