@@ -44,6 +44,7 @@ interface Fixture {
   branchId: string
   productId: string
   price: string
+  cashShiftId: string
 }
 
 async function createFixture(stock: number, price = '10.50'): Promise<Fixture> {
@@ -51,6 +52,7 @@ async function createFixture(stock: number, price = '10.50'): Promise<Fixture> {
   const userId = `pos-user-${suffix}`
   const tenantId = `pos-tenant-${suffix}`
   const branchId = `pos-branch-${suffix}`
+  const cashShiftId = `pos-shift-${suffix}`
   const roleId = `pos-role-${suffix}`
   const membershipId = `pos-membership-${suffix}`
   const productId = `pos-product-${suffix}`
@@ -69,6 +71,13 @@ async function createFixture(stock: number, price = '10.50'): Promise<Fixture> {
   await prisma.branch.create({
     data: { id: branchId, tenantId, name: `Branch ${suffix}` },
   })
+  await prisma.$executeRaw`
+    INSERT INTO "CashShift"
+      (id, "tenantId", "branchId", "openedByUserId", status, "openingCash")
+    VALUES
+      (${cashShiftId}, ${tenantId}, ${branchId}, ${userId},
+       'OPEN'::"CashShiftStatus", 0)
+  `
   await prisma.tenantPermission.upsert({
     where: { key: 'sales.create' },
     create: {
@@ -151,7 +160,7 @@ async function createFixture(stock: number, price = '10.50'): Promise<Fixture> {
     })
   }
   currentActorId = userId
-  return { userId, tenantId, branchId, productId, price }
+  return { userId, tenantId, branchId, productId, price, cashShiftId }
 }
 
 function saleBody(
@@ -451,6 +460,7 @@ describe('Sales POS on isolated PostgreSQL', () => {
     const common = {
       tenantId: fixture.tenantId,
       branchId: fixture.branchId,
+      cashShiftId: fixture.cashShiftId,
       actorUserId: fixture.userId,
       invoiceNumber,
       requestHash: 'a'.repeat(64),

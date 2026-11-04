@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 
 import type { AppTranslations } from '../../../i18n'
+import { numberLocale } from '../../../i18n/numbers'
 import { transactions } from '../../../data/demoData'
 import type {
   Language,
@@ -19,7 +20,7 @@ export default function TransactionsTable({
   search,
 }: TransactionsTableProps) {
   const formatter = new Intl.NumberFormat(
-    language === 'ar' ? 'ar-EG' : 'en-US',
+    numberLocale(language),
   )
 
   const statusLabels = {

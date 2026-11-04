@@ -1,4 +1,4 @@
-.sales-login {
+﻿.sales-login {
   max-width: 440px;
 }
 
@@ -235,6 +235,22 @@
 .sales-history-list article > div {
   display: grid;
   gap: 5px;
+}
+
+.sales-history-actions {
+  justify-items: end;
+}
+
+.sales-history-actions button {
+  min-height: 36px;
+}
+
+.product-success {
+  padding: 12px 14px;
+  border: 1px solid #87c9a2;
+  border-radius: 10px;
+  background: #effaf2;
+  color: #246b3b;
 }
 
 .sales-history-list time {

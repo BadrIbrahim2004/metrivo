@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react'
 import type { AppTranslations } from '../../i18n'
-
-interface WorkspaceBranch {
-  tenantId: string
-  tenantName: string
-  branchId: string
-  branchName: string
-}
+import { numberLocale } from '../../i18n/numbers'
+import InvoiceView from './InvoiceView'
+import type { ReceiptSettings } from './receipt-settings'
+import type { PageSession } from '../../types'
+import { authedFetch, usePageSession } from '../../app/usePageSession'
 
 interface CatalogProduct {
   id: string
@@ -26,9 +24,19 @@ interface SaleLine {
 interface Sale {
   id: string
   invoiceNumber: string
+  subtotal?: string
+  discount?: string
+  surcharge?: string
+  customerName?: string | null
+  adjustmentReason?: string | null
+  cashReceived?: string | null
+  changeDue?: string | null
   total: string
   status: string
   createdAt: string
+  returnId?: string | null
+  refundAmount?: string | null
+  refundStatus?: string | null
   items?: Array<{
     productId: string
     productName: string
@@ -40,28 +48,15 @@ interface Sale {
   paymentMethod?: string
 }
 
-interface SalesPageProps {
+interface SalesPageProps extends PageSession {
   t: AppTranslations
   language: 'ar' | 'en'
 }
 
-async function apiRequest<T>(
-  path: string,
-  token: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  })
-  if (!response.ok) {
-    throw new Error('request')
-  }
-  return await response.json() as T
+interface ReprintState {
+  invoice: Sale & { items: NonNullable<Sale['items']> }
+  branchName: string
+  receiptSettings: ReceiptSettings
 }
 
 function cents(value: string): number {
@@ -70,20 +65,28 @@ function cents(value: string): number {
 }
 
 function money(centsValue: number, language: 'ar' | 'en'): string {
-  return new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-EG', {
+  return new Intl.NumberFormat(numberLocale(language), {
     style: 'currency',
     currency: 'EGP',
     maximumFractionDigits: 2,
   }).format(centsValue / 100)
 }
 
-export default function SalesPage({ t, language }: SalesPageProps) {
+export default function SalesPage({
+  t,
+  language,
+  sessionToken,
+  workspaces,
+  onSessionExpired,
+}: SalesPageProps) {
   const copy = t.salesManagement
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [token, setToken] = useState('')
-  const [workspaces, setWorkspaces] = useState<WorkspaceBranch[]>([])
-  const [branchId, setBranchId] = useState('')
+  const session = usePageSession({
+    sessionToken,
+    workspaces,
+    onSessionExpired,
+  })
+  const token = session.token
+  const [selectedBranchId, setSelectedBranchId] = useState(session.branchId)
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [cart, setCart] = useState<SaleLine[]>([])
   const [search, setSearch] = useState('')
@@ -92,10 +95,13 @@ export default function SalesPage({ t, language }: SalesPageProps) {
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [history, setHistory] = useState<Sale[]>([])
   const [receipt, setReceipt] = useState<Sale | null>(null)
+  const [reprint, setReprint] = useState<ReprintState | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
-  const workspace = workspaces.find((item) => item.branchId === branchId)
+  const activeBranchId = selectedBranchId || session.branchId
+  const workspace = workspaces.find((item) => item.branchId === activeBranchId)
   const basePath = workspace
     ? `/api/tenants/${encodeURIComponent(workspace.tenantId)}` +
       `/branches/${encodeURIComponent(workspace.branchId)}/sales`
@@ -120,37 +126,12 @@ export default function SalesPage({ t, language }: SalesPageProps) {
     : 0
   const totalCents = Math.max(0, subtotalCents - discountCents)
 
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      const result = await apiRequest<{ accessToken: string }>(
-        '/api/auth/login',
-        '',
-        { method: 'POST', body: JSON.stringify({ email, password }) },
-      )
-      const authorizedBranches = await apiRequest<WorkspaceBranch[]>(
-        '/api/auth/workspaces',
-        result.accessToken,
-      )
-      setToken(result.accessToken)
-      setWorkspaces(authorizedBranches)
-      setBranchId(authorizedBranches[0]?.branchId ?? '')
-      setPassword('')
-    } catch {
-      setError(copy.loginFailed)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   useEffect(() => {
     if (!token || !basePath) return
     let cancelled = false
     void Promise.all([
-      apiRequest<CatalogProduct[]>(`${basePath}/catalog`, token),
-      apiRequest<Sale[]>(basePath, token).catch(() => []),
+      authedFetch<CatalogProduct[]>(`${basePath}/catalog`, token, onSessionExpired),
+      authedFetch<Sale[]>(basePath, token, onSessionExpired).catch(() => []),
     ]).then(([nextCatalog, nextHistory]) => {
       if (!cancelled) {
         setCatalog(nextCatalog)
@@ -162,7 +143,7 @@ export default function SalesPage({ t, language }: SalesPageProps) {
     return () => {
       cancelled = true
     }
-  }, [token, basePath, copy.requestFailed])
+  }, [token, basePath, copy.requestFailed, onSessionExpired])
 
   function addProduct(productId: string) {
     setCart((current) => {
@@ -196,7 +177,7 @@ export default function SalesPage({ t, language }: SalesPageProps) {
     setBusy(true)
     setError('')
     try {
-      const completed = await apiRequest<Sale>(basePath, token, {
+      const completed = await authedFetch<Sale>(basePath, token, onSessionExpired, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
@@ -209,7 +190,7 @@ export default function SalesPage({ t, language }: SalesPageProps) {
       setCart([])
       setDiscount('0.00')
       setIdempotencyKey(crypto.randomUUID())
-      const refreshed = await apiRequest<Sale[]>(basePath, token).catch(() => history)
+      const refreshed = await authedFetch<Sale[]>(basePath, token, onSessionExpired).catch(() => history)
       setHistory(refreshed)
     } catch {
       setError(copy.requestFailed)
@@ -218,15 +199,76 @@ export default function SalesPage({ t, language }: SalesPageProps) {
     }
   }
 
+  async function returnSale(sale: Sale) {
+    if (!basePath || sale.returnId || busy) return
+    if (!window.confirm(copy.confirmFullReturn)) return
+    const reason = window.prompt(copy.returnReasonPrompt)?.trim() ?? ''
+    if (reason.length < 5) {
+      setError(copy.returnReasonRequired)
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const recorded = await authedFetch<{
+        id: string
+        refundAmount: string
+        refundStatus: string
+      }>(
+        `${basePath}/${encodeURIComponent(sale.id)}/return`,
+        token,
+        onSessionExpired,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': `return-${crypto.randomUUID()}` },
+          body: JSON.stringify({ reason }),
+        },
+      )
+      setHistory((current) => current.map((item) =>
+        item.id === sale.id
+          ? {
+              ...item,
+              returnId: recorded.id,
+              refundAmount: recorded.refundAmount,
+              refundStatus: recorded.refundStatus,
+            }
+          : item,
+      ))
+      setNotice(copy.returnRecorded)
+    } catch {
+      setError(copy.requestFailed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openReprint(sale: Sale) {
+    if (!basePath || !workspace || busy) return
+    setError('')
+    try {
+      const detail = await authedFetch<Sale & { items: NonNullable<Sale['items']> }>(
+        `${basePath}/${encodeURIComponent(sale.id)}`,
+        token,
+        onSessionExpired,
+      )
+      const receiptSettings = await authedFetch<ReceiptSettings>(
+        `/api/tenants/${encodeURIComponent(workspace.tenantId)}/receipt-settings`,
+        token,
+        onSessionExpired,
+      )
+      setReprint({
+        invoice: detail,
+        branchName: workspace?.branchName ?? '',
+        receiptSettings,
+      })
+    } catch {
+      setError(copy.requestFailed)
+    }
+  }
+
   function logout() {
-    setToken('')
-    setWorkspaces([])
-    setBranchId('')
-    setCatalog([])
-    setCart([])
-    setHistory([])
-    setReceipt(null)
-    setPassword('')
+    onSessionExpired()
   }
 
   return (
@@ -243,42 +285,17 @@ export default function SalesPage({ t, language }: SalesPageProps) {
         )}
       </header>
 
-      {!token ? (
-        <form className="product-login-panel sales-login" onSubmit={(event) => void login(event)}>
-          <p>{copy.loginRequired}</p>
-          <label>
-            {t.productManagement.email}
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label>
-            {t.productManagement.password}
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          <button type="submit" className="button-primary" disabled={busy}>
-            {busy ? t.productManagement.loading : t.productManagement.login}
-          </button>
-        </form>
+      {workspaces.length === 0 ? (
+        <p className="product-empty">{t.productManagement.noBranches}</p>
       ) : (
-        <>
+      <>
           <div className="sales-toolbar">
             <label className="branch-picker">
               {t.productManagement.chooseBranch}
               <select
-                value={branchId}
+                value={selectedBranchId}
                 onChange={(event) => {
-                  setBranchId(event.target.value)
+                  setSelectedBranchId(event.target.value)
                   setCatalog([])
                   setCart([])
                   setReceipt(null)
@@ -286,7 +303,7 @@ export default function SalesPage({ t, language }: SalesPageProps) {
               >
                 {workspaces.map((item) => (
                   <option key={`${item.tenantId}:${item.branchId}`} value={item.branchId}>
-                    {item.tenantName} — {item.branchName}
+                    {item.tenantName} â€” {item.branchName}
                   </option>
                 ))}
               </select>
@@ -323,7 +340,7 @@ export default function SalesPage({ t, language }: SalesPageProps) {
                     >
                       <span className="sales-product-copy">
                         <strong>{product.name}</strong>
-                        <small>{product.sku} · {copy.available}: {product.stock}</small>
+                        <small>{product.sku} Â· {copy.available}: {product.stock}</small>
                       </span>
                       <strong>{money(cents(product.price), language)}</strong>
                     </button>
@@ -428,6 +445,13 @@ export default function SalesPage({ t, language }: SalesPageProps) {
             <div className="sales-receipt" role="status">
               <strong>{copy.saleComplete}: {receipt.invoiceNumber}</strong>
               <span>{money(cents(receipt.total), language)}</span>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => void openReprint(receipt)}
+              >
+                {t.invoice.print}
+              </button>
             </div>
           )}
 
@@ -441,18 +465,57 @@ export default function SalesPage({ t, language }: SalesPageProps) {
                   <article key={sale.id}>
                     <div>
                       <strong>{sale.invoiceNumber}</strong>
-                      <time>{new Date(sale.createdAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-EG')}</time>
+                      <time>{new Date(sale.createdAt).toLocaleString(numberLocale(language))}</time>
                     </div>
-                    <strong>{money(cents(sale.total), language)}</strong>
+                    <div className="sales-history-actions">
+                      <strong>{money(cents(sale.total), language)}</strong>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        disabled={busy}
+                        onClick={() => void openReprint(sale)}
+                      >
+                        {t.invoice.reprint}
+                      </button>
+                      {sale.returnId ? (
+                        <small>
+                          {copy.returnPending}
+                          {sale.refundAmount
+                            ? ` Â· ${money(cents(sale.refundAmount), language)}`
+                            : ''}
+                        </small>
+                      ) : (
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          disabled={busy}
+                          onClick={() => void returnSale(sale)}
+                        >
+                          {copy.returnFullSale}
+                        </button>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
             )}
           </section>
-        </>
+      </>
       )}
 
       {error && <p className="product-error" role="alert">{error}</p>}
+      {notice && <p className="product-success" role="status">{notice}</p>}
+
+      {reprint && (
+        <InvoiceView
+          invoice={reprint.invoice}
+          branchName={reprint.branchName}
+          receiptSettings={reprint.receiptSettings}
+          language={language}
+          t={t}
+          onClose={() => setReprint(null)}
+        />
+      )}
     </section>
   )
 }

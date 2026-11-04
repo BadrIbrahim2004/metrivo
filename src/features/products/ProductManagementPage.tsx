@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AppTranslations } from '../../i18n'
+import type { PageSession } from '../../types'
+import { authedFetch, usePageSession } from '../../app/usePageSession'
 
 interface WorkspaceBranch {
   tenantId: string
@@ -28,34 +30,8 @@ interface InventoryMovement {
   actorUserId: string
 }
 
-interface ProductManagementPageProps {
+interface ProductManagementPageProps extends PageSession {
   t: AppTranslations
-}
-
-async function apiRequest<T>(
-  path: string,
-  token: string,
-  init?: RequestInit,
-): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(path, {
-      ...init,
-      headers: {
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-        Authorization: `Bearer ${token}`,
-        ...init?.headers,
-      },
-    })
-  } catch {
-    throw new Error('network')
-  }
-
-  if (!response.ok) {
-    throw new Error('request')
-  }
-
-  return await response.json() as T
 }
 
 interface ProductCardProps {
@@ -64,6 +40,7 @@ interface ProductCardProps {
   workspace: WorkspaceBranch
   t: AppTranslations
   onChanged: () => void
+  onSessionExpired: () => void
 }
 
 function ProductCard({
@@ -72,6 +49,7 @@ function ProductCard({
   workspace,
   t,
   onChanged,
+  onSessionExpired,
 }: ProductCardProps) {
   const [name, setName] = useState(product.name)
   const [sku, setSku] = useState(product.sku)
@@ -91,7 +69,7 @@ function ProductCard({
     setBusy(true)
     setError('')
     try {
-      await apiRequest<Product>(basePath, token, {
+      await authedFetch<Product>(basePath, token, onSessionExpired, {
         method: 'PATCH',
         body: JSON.stringify({ name, sku, category, price }),
       })
@@ -107,7 +85,7 @@ function ProductCard({
     setBusy(true)
     setError('')
     try {
-      await apiRequest<Product>(basePath, token, {
+      await authedFetch<Product>(basePath, token, onSessionExpired, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !product.isActive }),
       })
@@ -124,7 +102,7 @@ function ProductCard({
     setBusy(true)
     setError('')
     try {
-      await apiRequest(`${basePath}/movements`, token, {
+      await authedFetch(`${basePath}/movements`, token, onSessionExpired, {
         method: 'POST',
         body: JSON.stringify({ quantityDelta: delta, reason }),
       })
@@ -145,9 +123,10 @@ function ProductCard({
     setBusy(true)
     setError('')
     try {
-      const result = await apiRequest<InventoryMovement[]>(
+      const result = await authedFetch<InventoryMovement[]>(
         `${basePath}/movements`,
         token,
+        onSessionExpired,
       )
       setMovements(result)
     } catch {
@@ -250,7 +229,7 @@ function ProductCard({
               <li key={movement.id}>
                 <strong>{movement.quantityDelta > 0 ? '+' : ''}{movement.quantityDelta}</strong>
                 <span>{movement.reason}</span>
-                <time>{new Date(movement.createdAt).toLocaleString()}</time>
+                <time>{new Date(movement.createdAt).toLocaleString('en-EG-u-nu-latn')}</time>
               </li>
             ))}
         </ul>
@@ -261,12 +240,13 @@ function ProductCard({
 
 export default function ProductManagementPage({
   t,
+  sessionToken,
+  workspaces,
+  onSessionExpired,
 }: ProductManagementPageProps) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [token, setToken] = useState('')
-  const [workspaces, setWorkspaces] = useState<WorkspaceBranch[]>([])
-  const [selectedBranchId, setSelectedBranchId] = useState('')
+  const session = usePageSession({ sessionToken, workspaces, onSessionExpired })
+  const token = session.token
+  const [selectedBranchId, setSelectedBranchId] = useState(session.branchId)
   const [products, setProducts] = useState<Product[]>([])
   const [loadedBranchId, setLoadedBranchId] = useState('')
   const [sku, setSku] = useState('')
@@ -281,37 +261,6 @@ export default function ProductManagementPage({
     ({ branchId }) => branchId === selectedBranchId,
   )
 
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      const result = await apiRequest<{ accessToken: string }>(
-        '/api/auth/login',
-        '',
-        {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        },
-      )
-      const branches = await apiRequest<WorkspaceBranch[]>(
-        '/api/auth/workspaces',
-        result.accessToken,
-      )
-      setToken(result.accessToken)
-      setWorkspaces(branches)
-      setSelectedBranchId(branches[0]?.branchId ?? '')
-      setProducts([])
-      setLoadedBranchId('')
-      setPassword('')
-      setError('')
-    } catch {
-      setError(t.productManagement.loginFailed)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
     const currentWorkspace = workspaces.find(
       ({ branchId }) => branchId === selectedBranchId,
@@ -321,7 +270,7 @@ export default function ProductManagementPage({
     const path =
       `/api/tenants/${encodeURIComponent(currentWorkspace.tenantId)}` +
       `/branches/${encodeURIComponent(currentWorkspace.branchId)}/products`
-    void apiRequest<Product[]>(path, token)
+    void authedFetch<Product[]>(path, token, onSessionExpired)
       .then((result) => {
         if (!cancelled) {
           setProducts(result)
@@ -334,7 +283,7 @@ export default function ProductManagementPage({
     return () => {
       cancelled = true
     }
-  }, [token, workspaces, selectedBranchId, refresh, t.productManagement.requestFailed])
+  }, [token, workspaces, selectedBranchId, refresh, t.productManagement.requestFailed, onSessionExpired])
 
   async function createProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -345,7 +294,7 @@ export default function ProductManagementPage({
       const path =
         `/api/tenants/${encodeURIComponent(workspace.tenantId)}` +
         `/branches/${encodeURIComponent(workspace.branchId)}/products`
-      await apiRequest<Product>(path, token, {
+      await authedFetch<Product>(path, token, onSessionExpired, {
         method: 'POST',
         body: JSON.stringify({ sku, name, category, price }),
       })
@@ -362,12 +311,7 @@ export default function ProductManagementPage({
   }
 
   function logout() {
-    setToken('')
-    setWorkspaces([])
-    setSelectedBranchId('')
-    setProducts([])
-    setLoadedBranchId('')
-    setPassword('')
+    onSessionExpired()
   }
 
   return (
@@ -384,35 +328,7 @@ export default function ProductManagementPage({
         )}
       </header>
 
-      {!token ? (
-        <form className="product-login-panel" onSubmit={(event) => void login(event)}>
-          <p>{t.productManagement.loginRequired}</p>
-          <label>
-            {t.productManagement.email}
-            <input
-              autoComplete="username"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label>
-            {t.productManagement.password}
-            <input
-              autoComplete="current-password"
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          <button type="submit" className="button-primary" disabled={loading}>
-            {loading ? t.productManagement.loading : t.productManagement.login}
-          </button>
-        </form>
-      ) : (
-        <>
+      <>
           <label className="branch-picker">
             {t.productManagement.chooseBranch}
             <select
@@ -477,6 +393,7 @@ export default function ProductManagementPage({
                     token={token}
                     workspace={workspace}
                     t={t}
+                    onSessionExpired={onSessionExpired}
                     onChanged={() => {
                       setLoadedBranchId('')
                       setRefresh((value) => value + 1)
@@ -487,7 +404,6 @@ export default function ProductManagementPage({
             </>
           )}
         </>
-      )}
 
       {error && <p className="product-error" role="alert">{error}</p>}
     </section>

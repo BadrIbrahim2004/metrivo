@@ -13,6 +13,7 @@ import {
   RequirePlatformOwner,
   RequirePlatformPermission,
   RequireTenantPermission,
+  RequireTenantOwner,
 } from '../src/authz.decorator'
 import { AuthorizationGuard } from '../src/authorization.guard'
 import { createPrismaMock } from './test-helpers'
@@ -29,6 +30,9 @@ class AuthorizationFixture {
 
   @RequireTenantPermission('tenant.permission')
   tenantRoute() {}
+
+  @RequireTenantOwner()
+  tenantOwnerRoute() {}
 
   @RequireAuthenticated()
   authenticatedRoute() {}
@@ -144,6 +148,33 @@ describe('AuthorizationGuard', () => {
     assert.equal(queryCalls.length, 0)
   })
 
+  it('allows only active tenant owners on owner-only routes', async () => {
+    const owner = makeGuard([[{ allowed: true }]])
+    const member = makeGuard([[{ allowed: false }]])
+
+    assert.equal(
+      await owner.guard.canActivate(
+        makeContext(AuthorizationFixture.prototype.tenantOwnerRoute, {
+          user: { userId: 'owner-1' },
+          params: { tenantId: 'tenant-1' },
+        }),
+      ),
+      true,
+    )
+    await assert.rejects(
+      member.guard.canActivate(
+        makeContext(AuthorizationFixture.prototype.tenantOwnerRoute, {
+          user: { userId: 'member-1' },
+          params: { tenantId: 'tenant-1' },
+        }),
+      ),
+      ForbiddenException,
+    )
+    assert.match(owner.queryCalls[0].text, /r\.name = 'Owner'/)
+    assert.ok(owner.queryCalls[0].values.includes('owner-1'))
+    assert.ok(owner.queryCalls[0].values.includes('tenant-1'))
+  })
+
   it('checks platform permissions only against the platform permission tables', async () => {
     const { guard, queryCalls } = makeGuard([[{ allowed: true }]])
 
@@ -208,7 +239,10 @@ describe('AuthorizationGuard', () => {
 
   it('denies access when membership is missing or inactive', async () => {
     for (const membership of ['missing', 'inactive']) {
-      const { guard, queryCalls } = makeGuard([[{ allowed: false }], []])
+      const { guard, queryCalls } = makeGuard([
+        [{ allowed: false }],
+        [{ available: false }],
+      ])
 
       await assert.rejects(
         guard.canActivate(
@@ -222,12 +256,16 @@ describe('AuthorizationGuard', () => {
       )
       assert.equal(queryCalls.length, 2)
       assert.match(queryCalls[0].text, /tm\.status = 'ACTIVE'/)
-      assert.match(queryCalls[1].text, /"SupportAccessGrant"/)
+      assert.match(queryCalls[1].text, /to_regclass/)
     }
   })
 
   it('denies expired support grants using the server clock', async () => {
-    const { guard, queryCalls } = makeGuard([[{ allowed: false }], []])
+    const { guard, queryCalls } = makeGuard([
+      [{ allowed: false }],
+      [{ available: true }],
+      [],
+    ])
 
     await assert.rejects(
       guard.canActivate(
@@ -238,12 +276,16 @@ describe('AuthorizationGuard', () => {
       ),
       ForbiddenException,
     )
-    assert.match(queryCalls[1].text, /g\."startsAt" <= CURRENT_TIMESTAMP/)
-    assert.match(queryCalls[1].text, /g\."expiresAt" > CURRENT_TIMESTAMP/)
+    assert.match(queryCalls[2].text, /g\."startsAt" <= CURRENT_TIMESTAMP/)
+    assert.match(queryCalls[2].text, /g\."expiresAt" > CURRENT_TIMESTAMP/)
   })
 
   it('denies revoked support grants', async () => {
-    const { guard, queryCalls } = makeGuard([[{ allowed: false }], []])
+    const { guard, queryCalls } = makeGuard([
+      [{ allowed: false }],
+      [{ available: true }],
+      [],
+    ])
 
     await assert.rejects(
       guard.canActivate(
@@ -254,12 +296,13 @@ describe('AuthorizationGuard', () => {
       ),
       ForbiddenException,
     )
-    assert.match(queryCalls[1].text, /g\."revokedAt" IS NULL/)
+    assert.match(queryCalls[2].text, /g\."revokedAt" IS NULL/)
   })
 
   it('allows an eligible support grant only when the access audit write succeeds', async () => {
     const { guard, queryCalls, executeCalls } = makeGuard([
       [{ allowed: false }],
+      [{ available: true }],
       [{ id: 'grant-1', reason: 'approved support investigation' }],
     ])
 
@@ -274,7 +317,7 @@ describe('AuthorizationGuard', () => {
       ),
       true,
     )
-    assert.equal(queryCalls.length, 2)
+    assert.equal(queryCalls.length, 3)
     assert.equal(executeCalls.length, 1)
     assert.match(executeCalls[0].text, /"SupportAccessAuditLog"/)
   })
@@ -283,6 +326,7 @@ describe('AuthorizationGuard', () => {
     const mock = createPrismaMock({
       queryResults: [
         [{ allowed: false }],
+        [{ available: true }],
         [{ id: 'grant-1', reason: 'approved support investigation' }],
       ],
       failAuditWrites: true,

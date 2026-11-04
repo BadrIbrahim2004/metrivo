@@ -1,0 +1,177 @@
+/* Metrivo — settings screen (invite / password / language / roles) */
+
+.settings-screen {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.settings-body {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 26px 20px;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-card {
+  padding: 24px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px #1720330a;
+}
+
+.settings-card h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.settings-hint {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.settings-card form {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.settings-card input,
+.settings-card select {
+  padding: 11px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: #faf9f5;
+}
+
+.settings-card input:focus,
+.settings-card select:focus {
+  outline: none;
+  border-color: #b5cfc0;
+  background: #fff;
+}
+
+.settings-confirm {
+  margin-top: 4px;
+  padding: 13px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  background: var(--primary);
+  box-shadow: 0 6px 16px #4a7c5938;
+  transition: filter .15s, transform .12s;
+}
+
+.settings-confirm:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+
+.settings-confirm:disabled {
+  opacity: .5;
+}
+
+.settings-result {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: var(--primary-soft);
+  border: 1.5px solid #b5cfc0;
+  color: var(--primary-dark);
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.settings-receipt-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.settings-receipt-logo img {
+  display: block;
+  max-width: 220px;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+}
+
+.settings-card label > small.settings-hint {
+  margin: 0;
+  font-size: 11px;
+}
+
+/* Language buttons */
+.settings-lang-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.settings-lang {
+  padding: 18px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: #faf9f5;
+  font: inherit;
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--text);
+  transition: border-color .14s, background .14s, color .14s;
+}
+
+.settings-lang:hover {
+  border-color: #b5cfc0;
+  background: var(--primary-soft);
+}
+
+.settings-lang-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  box-shadow: 0 0 0 3px #4a7c591a;
+}
+
+/* Roles list */
+.settings-roles-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-role {
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: #faf9f5;
+}
+
+.settings-role strong {
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+.muted-note {
+  color: var(--muted);
+  font-size: 13px;
+}

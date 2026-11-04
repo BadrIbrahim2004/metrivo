@@ -1,0 +1,77 @@
+# Metrivo — production compose stack
+# Usage: copy .env.production.example to .env.production, fill it in, then:
+#   docker compose -f compose.prod.yml --env-file .env.production up -d --build
+#
+# Safety: `prisma migrate deploy` never resets or drops data.
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - metrivo_prod_pgdata:/var/lib/postgresql
+    # Not exposed to the host: only reachable inside the compose network.
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  db-init:
+    # One-shot provisioning: protected NOLOGIN owner role + LOGIN migrator role
+    # + baseline schema owned by the protected role (platform security model).
+    # Exits after success; the API waits for it.
+    image: postgres:18-alpine
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      APP_PASSWORD: ${POSTGRES_PASSWORD}
+      MIGRATOR_PASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: db
+    volumes:
+      - ./apps/api/prisma/baseline:/workspace/prisma/baseline:ro
+      - ./apps/api/prisma/migrations:/workspace/prisma/migrations:ro
+    entrypoint: [ "/bin/sh", "/workspace/prisma/baseline/provision-db.sh" ]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://metrivo:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      AUTH_ACCESS_TOKEN_SECRET: ${AUTH_ACCESS_TOKEN_SECRET}
+      AUTH_ACCESS_TOKEN_ISSUER: ${AUTH_ACCESS_TOKEN_ISSUER}
+      AUTH_ACCESS_TOKEN_AUDIENCE: ${AUTH_ACCESS_TOKEN_AUDIENCE}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1 || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  metrivo_prod_pgdata:

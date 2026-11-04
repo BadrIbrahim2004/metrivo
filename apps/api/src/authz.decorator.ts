@@ -3,6 +3,7 @@ import { SetMetadata } from '@nestjs/common'
 export const IS_PUBLIC_ROUTE = 'authorization:is-public'
 export const PLATFORM_PERMISSION = 'authorization:platform-permission'
 export const TENANT_PERMISSION = 'authorization:tenant-permission'
+export const TENANT_OWNER_ONLY = 'authorization:tenant-owner-only'
 export const PLATFORM_OWNER_ONLY = 'authorization:platform-owner-only'
 export const AUTHENTICATED_ONLY = 'authorization:authenticated-only'
 
@@ -13,6 +14,9 @@ export const RequirePlatformPermission = (permissionKey: string) =>
 
 export const RequireTenantPermission = (permissionKey: string) =>
   SetMetadata(TENANT_PERMISSION, permissionKey)
+
+export const RequireTenantOwner = () =>
+  SetMetadata(TENANT_OWNER_ONLY, true)
 
 export const RequirePlatformOwner = () =>
   SetMetadata(PLATFORM_OWNER_ONLY, true)

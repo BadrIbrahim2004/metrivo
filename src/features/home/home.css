@@ -1,0 +1,145 @@
+/* Metrivo — home screen (permission-based module cards) */
+
+.home-screen {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 420px at 90% -10%, #dbe6ff 0%, transparent 55%),
+    radial-gradient(700px 400px at 5% 105%, #e8ecfb 0%, transparent 50%),
+    #f6f8fc;
+  padding: 34px clamp(20px, 6vw, 90px);
+}
+
+.home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.home-eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.home-header h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  letter-spacing: -.5px;
+  color: #1b2a4a;
+}
+
+.home-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.home-branch {
+  display: grid;
+  gap: 7px;
+  justify-items: end;
+}
+
+.home-branch-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: #40506a;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px #1720330d;
+}
+
+.home-error {
+  margin-bottom: 20px;
+}
+
+/* ---- Cards grid ---- */
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.home-card {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 22px 20px;
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  background: #fff;
+  text-align: start;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 3px 10px #1720330a;
+  transition: transform .14s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.home-card:hover {
+  transform: translateY(-3px);
+  border-color: #b9caff;
+  box-shadow: 0 12px 26px #3158d81f;
+}
+
+.home-card-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #fff;
+  box-shadow: 0 6px 16px #17203326;
+}
+
+.home-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.home-card-copy strong {
+  font-size: 17px;
+  color: #1b2a4a;
+}
+
+.home-card-copy small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.home-card-arrow {
+  font-size: 20px;
+  color: #b6bdca;
+  transition: color .15s, transform .15s;
+}
+
+.home-card:hover .home-card-arrow {
+  color: var(--primary);
+  transform: translateX(-4px);
+}
+
+.home-empty {
+  grid-column: 1 / -1;
+  padding: 50px 20px;
+  border: 1.5px dashed var(--border);
+  border-radius: 18px;
+  background: #fbfcfe;
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.home-note {
+  margin-top: 22px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+}

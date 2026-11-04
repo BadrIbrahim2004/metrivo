@@ -28,6 +28,7 @@ export interface CreateTenantInvitationInput {
   email: string
   tenantId: string
   roleId: string
+  branchId?: string
 }
 
 export interface CreatedTenantInvitation {
@@ -41,6 +42,7 @@ interface InvitationRecord {
   emailNormalized: string
   tenantId: string
   roleId: string
+  branchId: string | null
   rolePermissionsHash: string
 }
 
@@ -130,7 +132,7 @@ export class InvitationService {
       await tx.$executeRaw`
         INSERT INTO "TenantInvitation"
           ("id", "tokenHash", "email", "emailNormalized", "tenantId", "roleId",
-           "rolePermissionsHash", "invitedByUserId", "createdAt", "expiresAt")
+           "branchId", "rolePermissionsHash", "invitedByUserId", "createdAt", "expiresAt")
         VALUES (
           ${invitationId},
           ${tokenHash},
@@ -138,13 +140,13 @@ export class InvitationService {
           ${emailNormalized},
           ${input.tenantId},
           ${input.roleId},
+          ${input.branchId ?? null},
           ${rolePolicy.permissionsHash},
           ${actorUserId},
           CURRENT_TIMESTAMP,
           ${expiresAt}
         )
       `
-
       await writePlatformAudit(tx, {
         actorUserId,
         action: 'TENANT_INVITATION_CREATED',
@@ -237,7 +239,7 @@ export class InvitationService {
           AND "acceptedAt" IS NULL
           AND "revokedAt" IS NULL
           AND "expiresAt" > CURRENT_TIMESTAMP
-        RETURNING id, email, "emailNormalized", "tenantId", "roleId",
+        RETURNING id, email, "emailNormalized", "tenantId", "roleId", "branchId",
                   "rolePermissionsHash"
       `
       const invitation = rows[0]
@@ -307,6 +309,15 @@ export class InvitationService {
           CURRENT_TIMESTAMP
         )
       `
+      if (invitation.branchId) {
+        await tx.$executeRaw`
+          INSERT INTO "BranchMembership"
+            (id, "membershipId", "tenantId", "branchId", "createdAt")
+          VALUES
+            (${randomUUID()}, ${membershipId}, ${invitation.tenantId},
+             ${invitation.branchId}, CURRENT_TIMESTAMP)
+        `
+      }
 
       await writePlatformAudit(tx, {
         actorUserId: userId,
@@ -382,6 +393,7 @@ export class InvitationService {
   ): boolean {
     return (
       role.isInviteAssignable &&
+      role.name !== 'Owner' &&
       role.name !== PLATFORM_OWNER_ROLE_KEY &&
       role.name !== PLATFORM_ADMIN_ROLE_KEY
     )

@@ -43,6 +43,26 @@ export class CreateSaleDto {
   @Matches(MONEY_PATTERN)
   discount?: string
 
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY_PATTERN)
+  surcharge?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  customerName?: string | null
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  adjustmentReason?: string | null
+
   @IsEnum(SalePaymentMethod)
   paymentMethod!: SalePaymentMethod
+
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY_PATTERN)
+  cashReceived?: string
 }

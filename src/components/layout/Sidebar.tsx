@@ -4,6 +4,8 @@ import {
   CircleHelp,
   LayoutDashboard,
   Package,
+  ChefHat,
+  Receipt,
   Settings,
   ShoppingCart,
   Truck,
@@ -26,7 +28,7 @@ interface SidebarProps {
 }
 
 const navigationItems: {
-  key: PageKey
+  key: Exclude<PageKey, 'home'>
   icon: LucideIcon
 }[] = [
   { key: 'dashboard', icon: LayoutDashboard },
@@ -34,8 +36,9 @@ const navigationItems: {
   { key: 'products', icon: Package },
   { key: 'inventory', icon: Warehouse },
   { key: 'customers', icon: Users },
-  { key: 'suppliers', icon: Truck },
-  { key: 'finance', icon: Wallet },
+  { key: 'suppliers', icon: Truck },  { key: 'finance', icon: Wallet },
+  { key: 'expenses', icon: Receipt },
+  { key: 'production', icon: ChefHat },
   { key: 'reports', icon: BarChart3 },
 ]
 

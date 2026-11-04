@@ -1,4 +1,4 @@
-/* Shared layout */
+﻿/* Shared layout */
 .product-management-heading,
 .product-card-heading,
 .product-card-actions {
@@ -289,7 +289,7 @@
   width: min(28px, 70%);
   min-height: 4px;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, #6485f4, #3158d8);
+  background: linear-gradient(180deg, #6485f4, #4a7c59);
   transition: height 0.25s ease, opacity 0.2s ease;
 }
 
@@ -467,7 +467,7 @@
 }
 
 .avatar-blue {
-  color: #3158d8;
+  color: #4a7c59;
   background: #edf1ff;
 }
 

@@ -52,6 +52,11 @@ export interface SaleDetail {
   paymentMethod: SalePaymentMethod
   subtotal: string
   discount: string
+  surcharge: string
+  customerName: string | null
+  adjustmentReason: string | null
+  cashReceived: string | null
+  changeDue: string | null
   total: string
   createdAt: Date
   items: SaleItemResult[]
@@ -102,7 +107,13 @@ export class SalesService {
       throw new BadRequestException('Invalid sale request')
     }
     const discountCents = this.parseMoney(input.discount ?? '0')
+    const surchargeCents = this.parseMoney(input.surcharge ?? '0')
+    const customerName = this.normalizeOptionalText(input.customerName)
+    const adjustmentReason = this.normalizeOptionalText(input.adjustmentReason)
     const lines = this.validateLines(input)
+    if (discountCents > 0n && surchargeCents > 0n) {
+      throw new BadRequestException('A sale cannot have both a discount and a surcharge')
+    }
     if (
       !actorUserId ||
       !tenantId ||
@@ -114,14 +125,25 @@ export class SalesService {
     if (!Object.values(SalePaymentMethod).includes(input.paymentMethod)) {
       throw new BadRequestException('Invalid payment method')
     }
+    if (input.paymentMethod !== SalePaymentMethod.CASH && input.cashReceived !== undefined) {
+      throw new BadRequestException('Cash received is only valid for cash payments')
+    }
+    const tenderedCents = input.cashReceived === undefined
+      ? null
+      : this.parseMoney(input.cashReceived)
 
-    const normalizedRequest = JSON.stringify({
+    const normalizedRequest: Record<string, unknown> = {
       lines: [...lines].sort((a, b) => compareProductId(a.productId, b.productId)),
       discount: discountCents.toString(),
       paymentMethod: input.paymentMethod,
-    })
+    }
+    if (surchargeCents > 0n) normalizedRequest.surcharge = surchargeCents.toString()
+    if (customerName) normalizedRequest.customerName = customerName
+    if (adjustmentReason) normalizedRequest.adjustmentReason = adjustmentReason
+    if (tenderedCents !== null) normalizedRequest.cashReceived = tenderedCents.toString()
+    const requestBodyHash = JSON.stringify(normalizedRequest)
     const requestHash = createHash('sha256')
-      .update(normalizedRequest)
+      .update(requestBodyHash)
       .digest('hex')
 
     return this.prisma.$transaction(async (tx) => {
@@ -150,6 +172,20 @@ export class SalesService {
         return this.getSaleInTransaction(
           tx, tenantId, branchId, prior[0].id,
         )
+      }
+
+      const cashShift = input.paymentMethod === SalePaymentMethod.CASH
+        ? (await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id
+            FROM "CashShift"
+            WHERE "tenantId" = ${tenantId}
+              AND "branchId" = ${branchId}
+              AND status = 'OPEN'
+            FOR UPDATE
+          `)[0]
+        : undefined
+      if (input.paymentMethod === SalePaymentMethod.CASH && !cashShift) {
+        throw new ConflictException('Cash sale requires an open shift')
       }
 
       const products = new Map<string, LockedProduct>()
@@ -200,7 +236,7 @@ export class SalesService {
       if (
         subtotalCents > MAX_TOTAL_CENTS ||
         discountCents > subtotalCents ||
-        subtotalCents - discountCents > MAX_TOTAL_CENTS
+        subtotalCents - discountCents + surchargeCents > MAX_TOTAL_CENTS
       ) {
         throw new BadRequestException('Sale total is out of range')
       }
@@ -209,18 +245,34 @@ export class SalesService {
       const invoiceNumber = `POS-${Date.now()}-${randomUUID().slice(0, 8)}`
       const subtotal = this.formatMoney(subtotalCents)
       const discount = this.formatMoney(discountCents)
-      const total = this.formatMoney(subtotalCents - discountCents)
+      const surcharge = this.formatMoney(surchargeCents)
+      const total = this.formatMoney(subtotalCents - discountCents + surchargeCents)
+      const totalCents = subtotalCents - discountCents + surchargeCents
+      const cashReceivedCents = input.paymentMethod === SalePaymentMethod.CASH
+        ? tenderedCents ?? totalCents
+        : null
+      if (cashReceivedCents !== null && cashReceivedCents < totalCents) {
+        throw new BadRequestException('Cash received cannot be less than the sale total')
+      }
+      const changeDueCents = cashReceivedCents === null
+        ? null
+        : cashReceivedCents - totalCents
 
       await tx.$executeRaw`
         INSERT INTO "Sale"
           (id, "tenantId", "branchId", "actorUserId", "invoiceNumber",
            "idempotencyKey", "requestHash", status, "paymentMethod",
-           subtotal, discount, total, "createdAt")
+           subtotal, discount, surcharge, "customerName", "adjustmentReason",
+           "cashShiftId", "cashReceived", "changeDue", total, "createdAt")
         VALUES
           (${saleId}, ${tenantId}, ${branchId}, ${actorUserId},
            ${invoiceNumber}, ${idempotencyKey}, ${requestHash}, 'COMPLETED',
            ${input.paymentMethod}::"SalePaymentMethod", ${subtotal}::numeric,
-           ${discount}::numeric, ${total}::numeric, CURRENT_TIMESTAMP)
+           ${discount}::numeric, ${surcharge}::numeric, ${customerName},
+           ${adjustmentReason}, ${cashShift?.id ?? null},
+           ${cashReceivedCents === null ? null : this.formatMoney(cashReceivedCents)}::numeric,
+           ${changeDueCents === null ? null : this.formatMoney(changeDueCents)}::numeric,
+           ${total}::numeric, CURRENT_TIMESTAMP)
       `
 
       for (const line of pricedLines) {
@@ -265,7 +317,10 @@ export class SalesService {
                s."actorUserId", s.status::text AS status,
                s."paymentMethod"::text AS "paymentMethod",
                s.subtotal::text AS subtotal, s.discount::text AS discount,
-               s.total::text AS total, s."createdAt",
+               s.surcharge::text AS surcharge, s."customerName",
+               s."adjustmentReason", s.total::text AS total, s."createdAt",
+               s."cashReceived"::text AS "cashReceived",
+               s."changeDue"::text AS "changeDue",
                (SELECT COUNT(*)::int FROM "SaleItem" si
                 WHERE si."saleId" = s.id AND si."tenantId" = s."tenantId")
                  AS "itemCount"
@@ -304,6 +359,9 @@ export class SalesService {
       SELECT id, "invoiceNumber", "tenantId", "branchId", "actorUserId",
              status::text AS status, "paymentMethod"::text AS "paymentMethod",
              subtotal::text AS subtotal, discount::text AS discount,
+             surcharge::text AS surcharge, "customerName", "adjustmentReason",
+             "cashReceived"::text AS "cashReceived",
+             "changeDue"::text AS "changeDue",
              total::text AS total, "createdAt"
       FROM "Sale"
       WHERE id = ${saleId}
@@ -361,6 +419,11 @@ export class SalesService {
 
   private formatMoney(cents: bigint): string {
     return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`
+  }
+
+  private normalizeOptionalText(value: string | null | undefined): string | null {
+    const normalized = value?.trim()
+    return normalized ? normalized : null
   }
 
   private async assertBranchPermission(

@@ -25,6 +25,9 @@ const SALE = {
   paymentMethod: 'CASH',
   subtotal: '21.00',
   discount: '1.00',
+  surcharge: '0.00',
+  customerName: null,
+  adjustmentReason: null,
   total: '20.00',
   createdAt: new Date('2026-10-19T09:00:00.000Z'),
 }
@@ -55,6 +58,9 @@ function permittedMock(
     queryResponder(call) {
       if (call.text.includes('FROM "TenantMembership" tm')) {
         return [{ allowed: true }]
+      }
+      if (call.text.includes('FROM "CashShift"')) {
+        return [{ id: 'cash-shift-1' }]
       }
       return responder(call.text)
     },
@@ -89,6 +95,8 @@ describe('SalesService', () => {
     assert.equal(mock.transactionCount, 1)
     assert.equal(mock.executeCalls.length, 3)
     assert.match(mock.executeCalls[0].text, /INSERT INTO "Sale"/)
+    assert.match(mock.executeCalls[0].text, /"cashShiftId"/)
+    assert.ok(mock.executeCalls[0].values.includes('cash-shift-1'))
     assert.match(mock.executeCalls[1].text, /INSERT INTO "SaleItem"/)
     assert.match(mock.executeCalls[2].text, /INSERT INTO "InventoryMovement"/)
     assert.ok(mock.executeCalls[1].values.includes('Coffee'))
@@ -133,6 +141,128 @@ describe('SalesService', () => {
 
     await assert.rejects(
       service.createSale('user-1', 'tenant-1', 'branch-1', KEY, INPUT),
+      BadRequestException,
+    )
+    assert.equal(mock.executeCalls.length, 0)
+  })
+
+  it('records a surcharge and invoice context without treating it as a discount', async () => {
+    const mock = permittedMock(newSaleResponder)
+    const service = new SalesService(mock.prisma)
+
+    await service.createSale(
+      'user-1',
+      'tenant-1',
+      'branch-1',
+      KEY,
+      {
+        lines: [{ productId: 'product-1', quantity: 2 }],
+        surcharge: '2.50',
+        customerName: '  Nadia  ',
+        adjustmentReason: '  Service fee  ',
+        paymentMethod: 'CASH',
+      },
+    )
+
+    const insert = mock.executeCalls[0]
+    assert.match(insert.text, /surcharge/)
+    assert.match(insert.text, /"customerName"/)
+    assert.match(insert.text, /"adjustmentReason"/)
+    assert.ok(insert.values.includes('2.50'))
+    assert.ok(insert.values.includes('Nadia'))
+    assert.ok(insert.values.includes('Service fee'))
+    assert.ok(insert.values.includes('23.50'))
+  })
+
+  it('stores the cash tender and computes the customer change from the server total', async () => {
+    const mock = permittedMock(newSaleResponder)
+    const service = new SalesService(mock.prisma)
+
+    await service.createSale(
+      'user-1',
+      'tenant-1',
+      'branch-1',
+      KEY,
+      { ...INPUT, cashReceived: '25.00' },
+    )
+
+    const insert = mock.executeCalls[0]
+    assert.match(insert.text, /"cashReceived"/)
+    assert.match(insert.text, /"changeDue"/)
+    assert.ok(insert.values.includes('25.00'))
+    assert.ok(insert.values.includes('5.00'))
+  })
+
+  it('does not require or attach a cash shift to non-cash sales', async () => {
+    const mock = permittedMock(newSaleResponder)
+    const service = new SalesService(mock.prisma)
+
+    await service.createSale(
+      'user-1',
+      'tenant-1',
+      'branch-1',
+      KEY,
+      { ...INPUT, paymentMethod: 'CARD' },
+    )
+
+    const insert = mock.executeCalls[0]
+    assert.ok(!mock.queryCalls.some((call) => call.text.includes('FROM "CashShift"')))
+    assert.match(insert.text, /"cashShiftId"/)
+    assert.ok(!insert.values.includes('cash-shift-1'))
+  })
+
+  it('rejects cash tender below the computed sale total', async () => {
+    const mock = permittedMock(newSaleResponder)
+    const service = new SalesService(mock.prisma)
+
+    await assert.rejects(
+      service.createSale(
+        'user-1',
+        'tenant-1',
+        'branch-1',
+        KEY,
+        { ...INPUT, cashReceived: '19.99' },
+      ),
+      BadRequestException,
+    )
+    assert.equal(mock.executeCalls.length, 0)
+  })
+
+  it('rejects cash sales when the branch has no open shift', async () => {
+    const mock = createPrismaMock({
+      queryResponder(call) {
+        if (call.text.includes('FROM "TenantMembership" tm')) {
+          return [{ allowed: true }]
+        }
+        if (call.text.includes('FROM "CashShift"')) return []
+        if (call.text.includes('SELECT id, "requestHash"')) return []
+        return []
+      },
+    })
+    const service = new SalesService(mock.prisma)
+
+    await assert.rejects(
+      service.createSale('user-1', 'tenant-1', 'branch-1', KEY, INPUT),
+      ConflictException,
+    )
+    assert.equal(mock.executeCalls.length, 0)
+    assert.ok(mock.queryCalls.some((call) =>
+      call.text.includes('FROM "CashShift"') && call.text.includes('FOR UPDATE'),
+    ))
+  })
+
+  it('rejects a sale containing both a discount and a surcharge', async () => {
+    const mock = permittedMock()
+    const service = new SalesService(mock.prisma)
+
+    await assert.rejects(
+      service.createSale(
+        'user-1',
+        'tenant-1',
+        'branch-1',
+        KEY,
+        { ...INPUT, surcharge: '1.00' },
+      ),
       BadRequestException,
     )
     assert.equal(mock.executeCalls.length, 0)
@@ -200,6 +330,9 @@ describe('SalesService', () => {
       queryResponder(call) {
         if (call.text.includes('FROM "TenantMembership" tm')) {
           return [{ allowed: true }]
+        }
+        if (call.text.includes('FROM "CashShift"')) {
+          return [{ id: 'cash-shift-1' }]
         }
         if (call.text.includes('SELECT id, "requestHash"')) return []
         if (call.text.includes('FROM "Product"') && call.text.includes('FOR UPDATE')) {

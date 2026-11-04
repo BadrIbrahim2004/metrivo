@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { CalendarDays, TrendingUp } from 'lucide-react'
 import { chartData } from '../../../data/demoData'
 import type { AppTranslations } from '../../../i18n'
+import { numberLocale } from '../../../i18n/numbers'
 import type { Language } from '../../../types'
 
 type WeekdayKey =
@@ -51,7 +52,7 @@ export default function SalesChart({
 
       <div className="sales-chart-summary">
         <div>
-          <strong>{total.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</strong>
+          <strong>{total.toLocaleString(numberLocale(language))}</strong>
           <span>{t.dashboard.totalSales}</span>
         </div>
 

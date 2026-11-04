@@ -16,6 +16,12 @@ const migrations = [
   '20261019004400_invitation_role_policy',
   '20261019122000_products_inventory_branch_scope',
   '20261019124700_sales_pos',
+  '20261024010000_sale_returns',
+  '20261025010000_cash_management',
+  '20261103010000_sale_adjustments',
+  '20261103020000_sale_payment_methods',
+  '20261103030000_receipt_settings_cash_received',
+  '20261103040000_receipt_social_links',
 ]
 let projectWasAbsentBeforeStartup = false
 let startupAttempted = false

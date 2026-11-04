@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 
 import type { AppTranslations } from '../../i18n'
+import { numberLocale } from '../../i18n/numbers'
 import type { Language, PageKey } from '../../types'
 
 interface TopbarProps {
@@ -29,12 +30,12 @@ export default function Topbar({
   onMenuOpen,
 }: TopbarProps) {
   const pageTitle =
-    activePage === 'dashboard'
+    activePage === 'home' || activePage === 'dashboard'
       ? t.nav.dashboard
       : t.nav[activePage]
 
   const date = new Intl.DateTimeFormat(
-    language === 'ar' ? 'ar-EG' : 'en-GB',
+    numberLocale(language),
     {
       weekday: 'long',
       day: 'numeric',

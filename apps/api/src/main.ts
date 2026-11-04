@@ -1,12 +1,17 @@
 import { ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
+import { createRequire } from 'node:module'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule, { bodyParser: false })
   const config = app.get(ConfigService)
 
+  const jsonBodyParser = createRequire(__filename)('express').json({
+    limit: '800kb',
+  })
+  app.use(jsonBodyParser)
   app.setGlobalPrefix('api')
   app.useGlobalPipes(
     new ValidationPipe({

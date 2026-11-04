@@ -1,1 +1,1 @@
-export const ACCESS_TOKEN_TTL_SECONDS = 600
+export const ACCESS_TOKEN_TTL_SECONDS = 12 * 60 * 60

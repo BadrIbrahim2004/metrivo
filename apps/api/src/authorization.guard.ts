@@ -14,6 +14,7 @@ import {
   PLATFORM_OWNER_ONLY,
   PLATFORM_PERMISSION,
   TENANT_PERMISSION,
+  TENANT_OWNER_ONLY,
 } from './authz.decorator'
 
 interface AuthorizationRequest {
@@ -44,6 +45,10 @@ export class AuthorizationGuard implements CanActivate {
       TENANT_PERMISSION,
       targets,
     )
+    const tenantOwnerOnly = this.reflector.getAllAndOverride<boolean>(
+      TENANT_OWNER_ONLY,
+      targets,
+    )
     const platformOwnerOnly =
       this.reflector.getAllAndOverride<boolean>(PLATFORM_OWNER_ONLY, targets)
     const authenticatedOnly =
@@ -52,6 +57,7 @@ export class AuthorizationGuard implements CanActivate {
     const policyCount =
       Number(Boolean(platformPermission)) +
       Number(Boolean(tenantPermission)) +
+      Number(Boolean(tenantOwnerOnly)) +
       Number(Boolean(platformOwnerOnly)) +
       Number(Boolean(authenticatedOnly))
     if (policyCount !== 1) {
@@ -118,6 +124,32 @@ export class AuthorizationGuard implements CanActivate {
       throw new ForbiddenException('A tenant route parameter is required')
     }
 
+    if (tenantOwnerOnly) {
+      const ownerRows = await this.prisma.$queryRaw<Array<{ allowed: boolean }>>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM "TenantMembership" tm
+          JOIN "User" u
+            ON u.id = tm."userId"
+           AND u.status = 'ACTIVE'
+          JOIN "MembershipRole" mr
+            ON mr."membershipId" = tm.id
+           AND mr."tenantId" = tm."tenantId"
+          JOIN "Role" r
+            ON r.id = mr."roleId"
+           AND r."tenantId" = mr."tenantId"
+          WHERE tm."userId" = ${userId}
+            AND tm."tenantId" = ${tenantId}
+            AND tm.status = 'ACTIVE'
+            AND r.name = 'Owner'
+        ) AS allowed
+      `
+      if (!ownerRows[0]?.allowed) {
+        throw new ForbiddenException('Tenant owner required')
+      }
+      return true
+    }
+
     const membershipRows = await this.prisma.$queryRaw<
       Array<{ allowed: boolean }>
     >`
@@ -141,6 +173,18 @@ export class AuthorizationGuard implements CanActivate {
 
     if (membershipRows[0]?.allowed) {
       return true
+    }
+
+    const supportSchema = await this.prisma.$queryRaw<
+      Array<{ available: boolean }>
+    >`
+      SELECT
+        to_regclass('public."SupportAccessGrant"') IS NOT NULL
+        AND to_regclass('public."SupportAccessGrantPermission"') IS NOT NULL
+        AS available
+    `
+    if (!supportSchema[0]?.available) {
+      throw new ForbiddenException('Tenant permission required')
     }
 
     const grants = await this.prisma.$queryRaw<

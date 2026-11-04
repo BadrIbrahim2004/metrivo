@@ -33,6 +33,16 @@ enum SalePaymentMethod {
   CARD
   BANK_TRANSFER
   OTHER
+  INSTAPAY
+  WALLET
+  FAWRY
+}
+
+enum SupplierPaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  OTHER
 }
 
 model User {
@@ -59,6 +69,20 @@ model User {
 model Tenant {
   id             String              @id @default(cuid())
   name           String
+  receiptDisplayName String?
+  receiptLogoDataUrl String?          @db.Text
+  receiptPhone   String?
+  receiptAddress String?
+  receiptFacebook String?
+  receiptInstagram String?
+  receiptTiktok String?
+  receiptYoutube String?
+  receiptWhatsapp String?
+  receiptX String?
+  receiptTelegram String?
+  receiptSnapchat String?
+  receiptLinkedin String?
+  receiptWebsite String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   branches       Branch[]
@@ -82,6 +106,7 @@ model Branch {
   memberships BranchMembership[]
   inventoryMovements InventoryMovement[]
   sales              Sale[]
+  invitations        TenantInvitation[]
 
   @@unique([tenantId, name])
   @@unique([id, tenantId])
@@ -254,6 +279,7 @@ model TenantInvitation {
   emailNormalized      String
   tenantId             String
   roleId               String
+  branchId             String?
   rolePermissionsHash  String    @db.Char(64)
   invitedByUserId      String
   createdAt            DateTime  @default(now()) @db.Timestamptz(6)
@@ -262,6 +288,7 @@ model TenantInvitation {
   acceptedAt           DateTime? @db.Timestamptz(6)
   tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   role                 Role      @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  branch               Branch?   @relation(fields: [branchId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
   invitedBy            User      @relation("InvitationIssuer", fields: [invitedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([tenantId, createdAt])
@@ -324,6 +351,12 @@ model Sale {
   paymentMethod  SalePaymentMethod
   subtotal       Decimal          @db.Decimal(12, 2)
   discount       Decimal          @db.Decimal(12, 2)
+  surcharge      Decimal          @default(0) @db.Decimal(12, 2)
+  customerName   String?          @db.VarChar(120)
+  adjustmentReason String?        @db.VarChar(200)
+  cashShiftId      String?
+  cashReceived     Decimal?         @db.Decimal(12, 2)
+  changeDue      Decimal?          @db.Decimal(12, 2)
   total          Decimal          @db.Decimal(12, 2)
   createdAt      DateTime         @default(now()) @db.Timestamptz(6)
   tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)

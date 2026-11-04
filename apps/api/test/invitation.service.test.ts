@@ -258,6 +258,28 @@ describe('InvitationService', () => {
     )
   })
 
+  it('grants the selected branch when the invitation is accepted', async () => {
+    const invitation = { ...INVITATION, branchId: 'branch-1' }
+    const mock = createPrismaMock({
+      queryResults: [
+        [{ id: invitation.id }],
+        [invitation],
+        [],
+        ROLE_POLICY,
+        [{ id: 'new-user-id' }],
+      ],
+    })
+    const service = new InvitationService(mock.prisma)
+
+    await service.acceptInvitation('C'.repeat(43), 'correct horse battery staple')
+
+    const branchMembership = mock.executeCalls.find((call) =>
+      call.text.includes('INSERT INTO "BranchMembership"'),
+    )
+    assert.ok(branchMembership)
+    assert.ok(branchMembership.values.includes('branch-1'))
+  })
+
   it('does not create a second account when the normalized email already exists', async () => {
     const mock = createPrismaMock({
       queryResults: [

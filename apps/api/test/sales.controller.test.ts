@@ -94,4 +94,20 @@ describe('SalesController', () => {
     })
     assert.ok(errors.length > 0)
   })
+
+  it('accepts optional surcharge and invoice context fields', () => {
+    const input = plainToInstance(CreateSaleDto, {
+      lines: [{ productId: 'product-1', quantity: 1 }],
+      surcharge: '2.50',
+      customerName: 'Nadia',
+      adjustmentReason: 'Service fee',
+      paymentMethod: 'FAWRY',
+    })
+    const errors = validateSync(input, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      forbidUnknownValues: true,
+    })
+    assert.deepEqual(errors, [])
+  })
 })

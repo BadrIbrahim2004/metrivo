@@ -1,0 +1,5 @@
+-- Production baseline: required BEFORE the first guarded migration
+-- (20261018230000_platform_owner_admin_foundation), mirroring
+-- apps/api/test/fixtures/postgres-baseline.sql. Executed by the API
+-- entrypoint on a fresh production database, connected as the protected
+-- object-owner role.

@@ -1,6 +1,7 @@
 import { AlertTriangle, Package } from 'lucide-react'
 
 import type { AppTranslations } from '../../../i18n'
+import { numberLocale } from '../../../i18n/numbers'
 import { products } from '../../../data/demoData'
 import type { Language } from '../../../types'
 
@@ -18,7 +19,7 @@ export default function InventoryAlerts({
   )
 
   const formatter = new Intl.NumberFormat(
-    language === 'ar' ? 'ar-EG' : 'en-US',
+    numberLocale(language),
   )
 
   return (

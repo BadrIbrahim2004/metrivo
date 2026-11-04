@@ -1,13 +1,20 @@
 export type Language = 'ar' | 'en'
 
+export type { PageSession } from '../app/pageSession'
+
 export type PageKey =
+  | 'home'
   | 'dashboard'
+  | 'shift'
+  | 'settings'
   | 'sales'
   | 'products'
   | 'inventory'
   | 'customers'
   | 'suppliers'
   | 'finance'
+  | 'expenses'
+  | 'production'
   | 'reports'
   | 'settings'
 

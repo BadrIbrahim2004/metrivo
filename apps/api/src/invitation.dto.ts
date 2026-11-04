@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer'
 import {
+  IsOptional,
   IsEmail,
   IsString,
   Matches,
@@ -25,6 +26,12 @@ export class CreateTenantInvitationDto {
   @MinLength(1)
   @MaxLength(255)
   roleId!: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  branchId?: string
 }
 
 export class AcceptInvitationDto {

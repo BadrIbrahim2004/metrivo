@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 
 import type { AppTranslations } from '../../../i18n'
+import { numberLocale } from '../../../i18n/numbers'
 
 interface StatsGridProps {
   t: AppTranslations
@@ -55,7 +56,7 @@ export default function StatsGrid({
   ]
 
   const numberFormatter = new Intl.NumberFormat(
-    language === 'ar' ? 'ar-EG' : 'en-US',
+    numberLocale(language),
   )
 
   return (
