@@ -83,6 +83,11 @@ The Prisma schema includes a nullable password hash and an active/disabled user 
 
 ## Local activation-only deployment
 
+For a free deployment that does not require adding a payment card, use the
+Cloudflare Workers implementation in `../activation-worker/README.md`. The
+Render instructions below are an alternative if the account's card verification
+is acceptable.
+
 The activation API can be deployed separately from the unfinished general API
 using `npm run start:activation`. This entry point exposes only
 `GET /api/health`, `POST /api/activation/request`, and

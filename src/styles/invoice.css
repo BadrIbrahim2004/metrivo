@@ -329,14 +329,14 @@
 /* Print only the receipt on a standard 80 mm thermal roll. */
 @media print {
   @page {
-    size: auto;
+    size: 80mm 297mm;
     margin: 0;
   }
 
   html,
   body,
   #root {
-    width: 80mm !important;
+    width: 100% !important;
     min-width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -363,18 +363,18 @@
   .app-shell:has(.invoice-overlay),
   .pos-screen:has(.invoice-overlay),
   .sales-page:has(.invoice-overlay) {
-    width: 80mm !important;
+    width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
   }
 
   .invoice-overlay {
-    position: absolute;
-    inset: 0 auto auto 0;
+    position: fixed;
+    inset: 0;
     display: block;
-    width: 80mm;
-    min-width: 80mm;
+    width: 100%;
+    min-width: 0;
     margin: 0;
     padding: 0;
     background: none;
@@ -383,39 +383,44 @@
 
   .invoice-dialog {
     display: block;
-    width: 80mm !important;
-    max-width: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
     max-height: none;
     margin: 0;
     overflow: visible;
+    text-align: center;
     box-shadow: none;
     border-radius: 0;
   }
 
   .invoice-paper {
-    display: flex;
+    display: block;
     box-sizing: border-box;
     width: 80mm !important;
+    min-width: 80mm !important;
     max-width: 80mm !important;
     min-height: 0;
-    margin: 0;
+    margin: 0 auto;
     overflow: visible;
-    padding: 4mm !important;
-    align-items: stretch;
+    padding: 0 !important;
+    text-align: center;
     color: #000;
-    font-size: 9pt;
-    line-height: 1.25;
+    font-size: 10.5pt;
+    line-height: 1.35;
     box-shadow: none;
   }
 
   .invoice-paper > * {
     box-sizing: border-box;
-    width: 100%;
-    max-width: none;
+    width: 72mm !important;
+    min-width: 72mm !important;
+    max-width: 72mm !important;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .invoice-shop {
-    font-size: 12pt;
+    font-size: 14pt;
   }
 
   .invoice-meta,
@@ -441,49 +446,92 @@
   }
 
   .invoice-logo {
-    max-width: 56mm;
-    max-height: 20mm;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    max-height: 26mm;
+    height: auto;
+    margin: 0 0 8px -4mm !important;
+    object-fit: contain;
   }
 
   .invoice-branch,
   .invoice-cashier,
   .invoice-meta,
   .invoice-totals {
-    font-size: 8.5pt;
+    font-size: 10pt;
   }
 
   .invoice-lines {
     table-layout: fixed;
-    font-size: 7.5pt;
+    display: table;
+    box-sizing: border-box;
+    width: 72mm !important;
+    min-width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto 14px !important;
+    font-size: 10pt;
     break-inside: auto;
-    border: 1px solid #333;
+    border: 1.5pt solid #000 !important;
+    border-collapse: collapse;
+    color: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .invoice-column-item {
+    width: 28%;
+  }
+
+  .invoice-column-quantity {
+    width: 18%;
+  }
+
+  .invoice-column-price,
+  .invoice-column-total {
+    width: 27%;
   }
 
   .invoice-lines th,
   .invoice-lines td {
-    padding: 2px 1px;
+    padding: 4px 1px;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    text-align: center !important;
+    vertical-align: middle;
+    border: 1pt solid #000 !important;
+    color: #000 !important;
+    font-size: 9pt;
+    font-weight: 700;
+    line-height: 1.25;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .invoice-lines th {
+    font-size: 9pt;
+    border-bottom: 1.5pt solid #000 !important;
+  }
+
+  .invoice-item-name {
+    overflow-wrap: break-word;
+    word-break: normal;
+    font-size: 10pt;
+    font-weight: 700;
+  }
+
+  .invoice-item-sku {
+    color: #111 !important;
     overflow-wrap: anywhere;
-    border-color: #333;
+    font-size: 8pt;
+    font-weight: 600;
   }
 
-  .invoice-lines th:first-child,
-  .invoice-lines td:first-child {
-    width: 34%;
-  }
-
-  .invoice-lines th:nth-child(2),
-  .invoice-lines td:nth-child(2) {
-    width: 16%;
-  }
-
-  .invoice-lines th:nth-child(3),
-  .invoice-lines td:nth-child(3) {
-    width: 25%;
-  }
-
-  .invoice-lines th:nth-child(4),
-  .invoice-lines td:nth-child(4) {
-    width: 25%;
+  .invoice-line-money {
+    display: inline-block;
+    direction: ltr;
+    white-space: nowrap;
+    font-size: 8pt;
   }
 
   .invoice-lines tr,
