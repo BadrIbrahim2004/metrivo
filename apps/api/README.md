@@ -81,6 +81,50 @@ The proposed migration `20261019124700_sales_pos` depends on `20261019122000_pro
 
 The Prisma schema includes a nullable password hash and an active/disabled user status, but the proposed platform migration does not create or update those authentication columns. Existing users do not gain credentials from this schema change: users without a password hash cannot log in. Before authentication can be used against an existing database, an approved baseline/authentication migration must add these columns and decide how existing emails will be normalized and how duplicate case variants will be resolved.
 
+## Local activation-only deployment
+
+The activation API can be deployed separately from the unfinished general API
+using `npm run start:activation`. This entry point exposes only
+`GET /api/health`, `POST /api/activation/request`, and
+`POST /api/activation/verify`; it does not expose the other Metrivo API routes.
+For an initial free deployment, use a Render free web service and a Neon free
+PostgreSQL project. Render free services sleep after 15 minutes without traffic
+and can take about a minute to wake. Neon free usage is limited and scales to
+zero, so this is suitable for a low-volume start, not a production availability
+guarantee.
+
+Configure Render with root directory `apps/api`, build command
+`npm ci && npm run prisma:generate && npm run build`, and start command
+`npm run start:activation`. Set `HOST=0.0.0.0` and `NODE_ENV=production`.
+Configure `DATABASE_URL` using the Neon pooled or direct connection string,
+with any reserved password characters URL-encoded.
+
+The repository has no production baseline migration and contains other
+unapplied migrations. Do not run `prisma migrate deploy` against this
+activation-only database. In a new, dedicated Neon database, execute only the
+SQL from
+`prisma/migrations/20261113010000_local_activation_challenges/migration.sql`
+in Neon's SQL Editor; this creates the table and indexes used by activation.
+Do not use the shop's data database for this service.
+
+Set these additional Render variables in its environment dashboard; never
+commit them or send them in chat:
+
+- `ACTIVATION_OWNER_EMAIL`: the one email address that receives all codes.
+- `ACTIVATION_OTP_PEPPER`: a unique random value of at least 32 bytes.
+- `ACTIVATION_SIGNING_PRIVATE_KEY_PEM`: the Ed25519 private key matching the
+  public key included in the Desktop build.
+- `ACTIVATION_MAIL_WEBHOOK_URL`: the deployed Google Apps Script `/exec` URL.
+- `ACTIVATION_MAILER_SHARED_SECRET`: a unique random value of at least 32 bytes,
+  identical to the Apps Script `METRIVO_MAILER_SHARED_SECRET` property.
+
+The Google Apps Script mail relay setup and signed request protocol are
+documented in `scripts/google-apps-script/README.md`. The relay runs as your
+Google account and is protected by an HMAC signature; Google account email
+quotas and Render's free-instance limits still apply. Verify
+`https://<render-service>.onrender.com/api/health` reports a connected
+database, then test code delivery before building the Desktop installer.
+
 The Prisma schema does not express PostgreSQL `CHECK` constraints for non-blank support reasons and `expiresAt > startsAt` with a maximum one-hour duration. The five-permission limit and support-eligibility check are enforced by `SupportAccessService`, not by a database constraint. Add and review SQL constraints/triggers for those invariants before relying on database-enforced duration or permission limits. The proposed platform migration adds append-only triggers for `SupportAccessAuditLog`; they have not been applied or tested against PostgreSQL.
 
 Run all API unit tests with `npm test`. They use Node's built-in test runner and mocks; they do not replace integration tests against an isolated PostgreSQL test database.

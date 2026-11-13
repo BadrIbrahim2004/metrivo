@@ -296,6 +296,18 @@ model TenantInvitation {
   @@index([expiresAt])
 }
 
+model LocalActivationChallenge {
+  id         String    @id @db.VarChar(36)
+  deviceId   String    @db.VarChar(43)
+  codeHash   String    @db.Char(64)
+  expiresAt  DateTime  @db.Timestamptz(6)
+  consumedAt DateTime? @db.Timestamptz(6)
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([deviceId, createdAt])
+  @@index([expiresAt])
+}
 model Product {
   id          String   @id @default(cuid())
   tenantId    String
